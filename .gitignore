@@ -1,0 +1,6 @@
+*.log
+*lib/*
+*.pyc
+*.egg-info
+.idea*
+*ipynb_checkpoints*
