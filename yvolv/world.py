@@ -4,9 +4,9 @@ import numpy as np
 class World(object):
 
   FOOD_AMOUNT_EPSILON = 0.001
-  PROTEIN_HUE_EPSILON = 0.1
+  PROTEIN_HUE_EPSILON = 0.0001
 
-  def __init__(self, xsize=100, ysize=100):
+  def __init__(self, xsize=100, ysize=100, tpoints=30, bpoints=50):
     # Dimensions of the world, a grid of tiles
     self.xsize = xsize
     self.ysize = ysize
@@ -28,14 +28,8 @@ class World(object):
     # Determines who can eat this tile's food, and who it poisons.
     self.protein_hue = np.zeros_like(self.fertility)
 
-    # Visible color
-    self.H = np.zeros_like(self.fertility)
-    self.S = np.zeros_like(self.fertility)
-    self.V = np.zeros_like(self.fertility)
-
     # Generate some starting values
-    self._build_map()
-    self._set_colors()
+    self._build_map(tpoints, bpoints)
 
     # Book keeping
     self.age = 0
@@ -69,9 +63,9 @@ class World(object):
 
     return np.tanh(np.sum(high_pulls, axis=0) - np.sum(low_pulls, axis=0))
 
-  def _build_map(self):
+  def _build_map(self, tpoints, bpoints):
     # Terrain types
-    elevation = self._attractor_field(30, 30) + np.random.normal(
+    elevation = self._attractor_field(tpoints, tpoints) + np.random.normal(
         0, 0.01, size=(self.xsize, self.ysize))
     water_cutoff = np.percentile(elevation, 40)
     boulder_cutoff = np.percentile(elevation, 95)
@@ -79,19 +73,10 @@ class World(object):
     self.terrain[elevation > boulder_cutoff] = 2
 
     # Vegetation
-    self.fertility = self._attractor_field(2, 2) + 1.0
+    self.fertility = (self._attractor_field(2, 2) + 1.0) * 1.0
     self.food_amount = self.fertility.copy()
-    self.protein_biome = (self._attractor_field(50, 50) + 1.0) / 2.0
+    self.protein_biome = (self._attractor_field(bpoints, bpoints) + 1.0) / 2.0
     self.protein_hue = self.protein_biome.copy()
-
-  def _set_colors(self):
-    self.H = self.protein_hue
-    self.S = np.ones_like(self.H)
-    #self.S = self.food_amount
-    self.V = np.ones_like(self.H) / 0.5
-    self.V[self.terrain == 0] = 0
-    self.V[self.terrain == 2] = 1
-    #self.terrain * np.float32(0.25)
 
   def tick(self):
     self.food_amount += (self.terrain == 1) * self.FOOD_AMOUNT_EPSILON * (
@@ -104,6 +89,13 @@ class World(object):
     if x < 0 or y < 0 or x >= self.xsize or y >= self.ysize:
       return False
     return True
+
+  def on_land(self, x, y):
+    if not self.valid_coords(x, y):
+        return False
+    if self.terrain[x, y] == 1:
+        return True
+    return False
 
   def percept_at(self, x, y):
     if not self.valid_coords(x, y):
