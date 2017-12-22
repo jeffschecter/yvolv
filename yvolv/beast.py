@@ -94,7 +94,7 @@ class Beast(object):
   METABOLIC_COST = 0.01
   DROWNING_COST = 0.01
   MOVEMENT_COST = 0.001
-  REPRODUCTION_COST = 1.0
+  REPRODUCTION_COST = 0.5
   DIG_COST = 0.1
 
   def __init__(self, world):
