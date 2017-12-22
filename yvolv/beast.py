@@ -74,7 +74,7 @@ class Beast(object):
   SENSOR_NEURONS = 13
   HIDDEN_NEURONS = 10
   MEMORY_NEURONS = 10
-  ACTION_NEURONS = 6  # left, right, forward, eat, reproduce, dig
+  ACTION_NEURONS = 5 # left, right, forward, eat, reproduce
 
   HIDDEN_CX = HIDDEN_NEURONS * (ACTION_NEURONS + SENSOR_NEURONS)
   MEMORY_CX = MEMORY_NEURONS * (HIDDEN_NEURONS + MEMORY_NEURONS)
@@ -95,7 +95,6 @@ class Beast(object):
   DROWNING_COST = 0.01
   MOVEMENT_COST = 0.001
   REPRODUCTION_COST = 0.5
-  DIG_COST = 0.1
 
   def __init__(self, world):
     self.world = world
@@ -118,6 +117,11 @@ class Beast(object):
     self.energy = 1.0
     self.heading = np.random.randint(0, 8)
 
+    # Action inventory
+    self.actions = (
+        self._left, self._forward, self._right,
+        self._eat, self._reproduce)
+
   def _perceive(self):
     # Where are my sensors?
     center_x, center_y = self.coords
@@ -139,16 +143,7 @@ class Beast(object):
     self.heading = (self.heading + 1) % 8
 
   def _forward(self):
-    # Deposit a slime trail
     self.energy -= self.energy * self.MOVEMENT_COST
-    x, y = self.coords
-    self.world.protein_hue[x, y] = (
-      ((self.world.protein_hue[x, y] * self.world.food_amount[x, y]) +
-       (self.protein_hue * self.MOVEMENT_COST / 5.0)) /
-      (self.world.food_amount[x, y] + (self.MOVEMENT_COST / 5.0)))
-    self.world.food_amount[x, y] += self.MOVEMENT_COST / 5.0
-
-    # Move to new coordinates
     x, y = self.coords + np.array(self.HEADINGS[self.heading])
     if not self.world.valid_coords(x, y):
       return
@@ -164,7 +159,7 @@ class Beast(object):
     x, y = self.coords
     food = self.world.food_amount[x, y]
     protein_hue = self.world.protein_hue[x, y]
-    compat = 0.4 - np.abs(self.protein_hue - protein_hue)
+    compat = 0.8 - (4.0 * np.abs(self.protein_hue - protein_hue))
     delta = compat * food
     self.energy += delta
     self.world.food_amount[x, y] = 0
@@ -173,21 +168,18 @@ class Beast(object):
     # Can you birth?
     if self.energy < self.REPRODUCTION_COST + (10 * self.METABOLIC_COST):
       return
-    anti_heading = (self.heading - 4) % 8
-    x, y = self.coords + np.array(self.HEADINGS[anti_heading])
-    if not self.world.valid_coords(x, y):
-      return
-    if self.world.terrain[x, y] == 2:
-      return
 
     # Child is a noisy copy
+    variance = np.random.gamma(2.0, 0.05)
     child = Beast(self.world)
     child.name = Namer.name()
-    child.coords = np.array([x, y])
-    child.protein_hue = (self.protein_hue + np.random.normal(0, 0.1)) % 1.0
-    child.pelt_rgb = (self.pelt_rgb + np.random.normal(0, 0.1)) % 1.0
+    child.coords = self.coords.copy()
+    child.protein_hue = (self.protein_hue + np.random.normal(
+        0, variance)) % 1.0
+    child.pelt_rgb = (self.pelt_rgb + np.random.normal(
+        0, variance / 3.0)) % 1.0
     child.synapses = self.synapses + np.random.normal(
-        0, 0.005, size=self.synapses.shape)
+        0, variance / 20.0, size=self.synapses.shape)
     child.brain = Brain(child)
     child.age = 0
     child.generation = self.generation + 1
@@ -198,38 +190,13 @@ class Beast(object):
     child.energy = self.energy
     return child
 
-  def _dig(self):
-    front_x, front_y = self.coords + np.array(self.HEADINGS[self.heading])
-    anti_heading = (self.heading - 4) % 8
-    rear_x, rear_y = self.coords + np.array(self.HEADINGS[anti_heading])
-    front_ok = self.world.valid_coords(front_x, front_y)
-    rear_ok = self.world.valid_coords(rear_x, rear_y)
-    if front_ok and rear_ok:
-      front_terrain = self.world.terrain[front_x, front_y]
-      rear_terrain = self.world.terrain[rear_x, rear_y]
-      if front_terrain != rear_terrain:
-        self.energy -= self.DIG_COST
-        self.world.terrain[front_x, front_y] = rear_terrain
-        self.world.terrain[rear_x, rear_y] = front_terrain
-
   def _take_action(self, action_ix):
-    if action_ix == 0:
-      self._left()
-    elif action_ix == 1:
-      self._forward()
-    elif action_ix == 2:
-      self._right()
-    elif action_ix == 3:
-      self._eat()
-    elif action_ix == 4:
-      return self._reproduce()
-    elif action_ix == 5:
-      self._dig()
+    return self.actions[action_ix]()
 
   def tick(self):
     self.age += 1
     starting_energy = self.energy
-    self.energy -= self.METABOLIC_COST * (2 ** (self.age / 500))
+    self.energy -= self.METABOLIC_COST * (2 ** (self.age / 100))
     x, y = self.coords
     if self.world.terrain[x, y] == 0:
       self.energy -= self.DROWNING_COST

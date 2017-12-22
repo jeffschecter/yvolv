@@ -36,7 +36,6 @@ class Simulation(object):
     self.rights = []
     self.eats = []
     self.reproduces = []
-    self.digs = []
 
   def _survives(self, bst):
     if bst.energy <= 0:
@@ -77,16 +76,16 @@ class Simulation(object):
     self.births.append(len(births))
     self.deaths.append(len(deaths))
     self.population.append(len(self.herd))
-    self.pop_ne.append(sum(
-        1 for bst in self.herd
-        if bst.coords[0] < we and bst.coords[1] > ns))
     self.pop_nw.append(sum(
         1 for bst in self.herd
+        if bst.coords[0] < we and bst.coords[1] > ns))
+    self.pop_ne.append(sum(
+        1 for bst in self.herd
         if bst.coords[0] > we and bst.coords[1] > ns))
-    self.pop_se.append(sum(
+    self.pop_sw.append(sum(
         1 for bst in self.herd
         if bst.coords[0] > we and bst.coords[1] < ns))
-    self.pop_sw.append(sum(
+    self.pop_se.append(sum(
         1 for bst in self.herd
         if bst.coords[0] < we and bst.coords[1] < ns))
     self.red_eaters.append(sum(
@@ -112,7 +111,6 @@ class Simulation(object):
     self.rights.append(actions.get(2, 0))
     self.eats.append(actions.get(3, 0))
     self.reproduces.append(actions.get(4, 0))
-    self.digs.append(actions.get(5, 0))
 
   def image(self):
     rgb = np.stack(
@@ -120,7 +118,8 @@ class Simulation(object):
        0.9 * np.ones_like(self.world.protein_hue.T),
        1 - 0.3 * (np.abs(self.world.protein_hue.T - 0.5) * 2)],
       axis=-1)
-    rgb *= np.expand_dims(0.8 + 0.1 * self.world.food_amount.T, -1)
+    rgb *= np.minimum(
+        1.0, np.expand_dims(0.7 + 2.0 * self.world.food_amount.T, -1))
     rgb[self.world.terrain.T == 0] = [0.6, 0.2, 0.8]
     rgb[self.world.terrain.T == 2] = [0.5, 0.5, 0.5]
     for bst in self.herd:
