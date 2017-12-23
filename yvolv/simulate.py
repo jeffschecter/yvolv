@@ -120,7 +120,7 @@ class Simulation(object):
       axis=-1)
     rgb *= np.minimum(
         1.0, np.expand_dims(0.7 + 2.0 * self.world.food_amount.T, -1))
-    rgb[self.world.terrain.T == 0] = [0.6, 0.2, 1.0]
+    rgb[self.world.terrain.T == 0] = [0.4, 0.3, 1.0]
     rgb[self.world.terrain.T == 2] = [0.3, 0.3, 0.3]
     for bst in self.herd:
       x, y = bst.coords
